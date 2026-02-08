@@ -3,6 +3,8 @@ import authRoutes from "./auth.routes.js";
 import shiftsRoutes from "./shifts.routes.js";
 import stockRoutes from "./stock.routes.js";
 import productsRoutes from "./products.routes.js";
+import salesRoutes from "./sales.routes.js";
+import printingRoutes from "./printing.routes.js";
 
 const router = Router();
 
@@ -15,5 +17,8 @@ router.use("/auth", authRoutes);
 router.use("/shifts", shiftsRoutes);
 router.use("/products", productsRoutes);
 router.use("/stock", stockRoutes);
+router.use("/sales", salesRoutes);
+router.use("/", printingRoutes);
+
 
 export default router;
