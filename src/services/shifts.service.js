@@ -28,10 +28,11 @@ export async function closeShift(shiftId, { closingCashCounted }, userId) {
   if (shift.status === "CLOSED") throw new AppError("Turno ya cerrado", 409, "SHIFT_CLOSED");
 
   // Totales por medio de pago a partir de ventas del turno
-  const totals = await Sale.aggregate([
-    { $match: { shiftId: shift._id, status: "COMPLETED" } },
-    { $group: { _id: "$paymentType", total: { $sum: "$total" } } },
-  ]);
+ const totals = await Sale.aggregate([
+  { $match: { shiftId: shift._id, status: "COMPLETED" } },
+  { $unwind: "$payments" },
+  { $group: { _id: "$payments.type", total: { $sum: "$payments.amount" } } },
+]);
 
   const totalsByPayment = { CASH: 0, DEBIT: 0, TRANSFER: 0, CREDIT: 0 };
   for (const t of totals) totalsByPayment[t._id] = t.total;
