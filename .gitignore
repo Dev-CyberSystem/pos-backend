@@ -1,0 +1,40 @@
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Build / coverage
+dist/
+build/
+coverage/
+*.lcov
+
+# Runtime
+logs/
+*.log
+
+# Cache
+.cache/
+.eslintcache
+.pnpm-store/
+
+# Optional: local DB files (si usás algo local tipo sqlite)
+*.sqlite
+*.sqlite3
+
+# Misc
+*.tgz
