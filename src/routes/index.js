@@ -1,4 +1,6 @@
 import { Router } from "express";
+import authRoutes from "./auth.routes.js";
+import shiftsRoutes from "./shifts.routes.js";
 
 const router = Router();
 
@@ -7,8 +9,7 @@ router.get("/", (req, res) => {
   res.json({ ok: true, message: "POS API" });
 });
 
-// Ejemplo de montaje (los creamos en el próximo paso):
-// import authRoutes from "./auth.routes.js";
-// router.use("/auth", authRoutes);
+router.use("/auth", authRoutes);
+router.use("/shifts", shiftsRoutes);
 
 export default router;
