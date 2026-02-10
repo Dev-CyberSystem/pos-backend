@@ -5,14 +5,8 @@
 // import StockMovement from "../models/StockMovement.js";
 // import { AppError } from "../utils/errors.js";
 
-// /**
-//  * Crea una venta de forma atómica:
-//  * - valida turno abierto
-//  * - valida productos + stock
-//  * - crea Sale (snapshots)
-//  * - descuenta stock
-//  * - crea StockMovement OUT reason SALE por ítem
-//  */
+// const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+
 // export async function createSale(payload, userId) {
 //   const session = await mongoose.startSession();
 //   session.startTransaction();
@@ -23,33 +17,29 @@
 //     if (!shift) throw new AppError("Turno no encontrado", 404, "SHIFT_NOT_FOUND");
 //     if (shift.status !== "OPEN") throw new AppError("El turno está cerrado", 409, "SHIFT_CLOSED");
 
-//     // 2) Traemos productos en lote
-//     const productIds = payload.items.map(i => i.productId);
-//     const products = await Product.find({ _id: { $in: productIds }, active: true })
-//       .session(session);
+//     // 2) Total pagado
+//     const totalPaid = round2(payload.payments.reduce((acc, p) => acc + p.amount, 0));
+//     if (totalPaid <= 0) throw new AppError("Pagos inválidos", 400, "INVALID_PAYMENTS");
 
+//     // 3) Traer productos (activos)
+//     const productIds = payload.items.map(i => i.productId);
+//     const products = await Product.find({ _id: { $in: productIds }, active: true }).session(session);
 //     const map = new Map(products.map(p => [p._id.toString(), p]));
 
-//     // 3) Armamos items con snapshots y validamos stock
+//     // 4) Armar items con snapshots y calcular total de items
 //     const saleItems = [];
-//     let total = 0;
+//     let itemsTotal = 0;
 
 //     for (const it of payload.items) {
 //       const p = map.get(it.productId);
 //       if (!p) throw new AppError(`Producto inválido o inactivo: ${it.productId}`, 400, "INVALID_PRODUCT");
 
 //       const qty = it.qty;
-
-//       // precio: si viene override lo usamos; si no, el actual
 //       const unitPrice = (it.unitPrice ?? p.priceCurrent);
 //       const unitCost = p.costCurrent;
 
-//       if (p.stockCurrent - qty < 0) {
-//         throw new AppError(`Stock insuficiente para ${p.name}`, 409, "INSUFFICIENT_STOCK");
-//       }
-
-//       const subtotal = qty * unitPrice;
-//       total += subtotal;
+//       const subtotal = round2(qty * unitPrice);
+//       itemsTotal = round2(itemsTotal + subtotal);
 
 //       saleItems.push({
 //         productId: p._id,
@@ -61,31 +51,46 @@
 //       });
 //     }
 
-//     // 4) Creamos Sale
+//     // 5) Validación: total pagado debe coincidir con total items
+//     if (round2(itemsTotal) !== round2(totalPaid)) {
+//       throw new AppError(
+//         `El total pagado (${totalPaid}) no coincide con el total de la venta (${itemsTotal})`,
+//         400,
+//         "TOTAL_MISMATCH"
+//       );
+//     }
+
+//     // 6) Descontar stock con condición (concurrencia-safe)
+//     for (const it of saleItems) {
+//       const updated = await Product.findOneAndUpdate(
+//         { _id: it.productId, stockCurrent: { $gte: it.qty } },
+//         { $inc: { stockCurrent: -it.qty } },
+//         { new: true, session }
+//       );
+
+//       if (!updated) {
+//         throw new AppError(`Stock insuficiente para ${it.nameSnapshot}`, 409, "INSUFFICIENT_STOCK");
+//       }
+//     }
+
+//     // 7) Crear venta
 //     const [sale] = await Sale.create(
 //       [{
 //         shiftId: shift._id,
 //         userId,
 //         items: saleItems,
-//         paymentType: payload.paymentType,
-//         total,
+//         payments: payload.payments,
+//         total: itemsTotal,
 //         status: "COMPLETED",
 //         ticketPrinted: false,
 //       }],
 //       { session }
 //     );
 
-//     // 5) Descontamos stock + movimientos
-//     //    (se hace por ítem; es OK para MVP. Si querés, optimizamos con bulkWrite luego)
-//     const movementsToCreate = [];
-//     for (const it of saleItems) {
-//       const p = map.get(it.productId.toString());
-
-//       p.stockCurrent = p.stockCurrent - it.qty;
-//       await p.save({ session });
-
-//       movementsToCreate.push({
-//         productId: p._id,
+//     // 8) Movimientos de stock
+//     await StockMovement.insertMany(
+//       saleItems.map(it => ({
+//         productId: it.productId,
 //         type: "OUT",
 //         reason: "SALE",
 //         qty: it.qty,
@@ -93,10 +98,9 @@
 //         saleId: sale._id,
 //         userId,
 //         note: `Venta ${sale._id.toString()}`,
-//       });
-//     }
-
-//     await StockMovement.insertMany(movementsToCreate, { session });
+//       })),
+//       { session }
+//     );
 
 //     await session.commitTransaction();
 //     session.endSession();
@@ -118,6 +122,41 @@ import { AppError } from "../utils/errors.js";
 
 const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 
+function ensureInt(n, code = "INVALID_QTY") {
+  if (!Number.isInteger(n)) throw new AppError("Cantidad inválida", 400, code);
+}
+
+function computeSubtotal(product, qty, unitPriceOverride) {
+  // UNIT => qty = unidades (int), precio = por unidad
+  if (product.uom === "UNIT") {
+    ensureInt(qty, "INVALID_QTY_UNIT");
+    if (qty <= 0) throw new AppError(`Cantidad inválida para ${product.name}`, 400, "INVALID_QTY_UNIT");
+
+    const unitPrice = unitPriceOverride ?? product.pricePerUnit;
+    if (unitPrice == null) throw new AppError(`Falta pricePerUnit en ${product.name}`, 500, "PRICE_MISSING");
+
+    const subtotal = round2(qty * unitPrice);
+    return { unitPriceSnapshot: unitPrice, subtotal };
+  }
+
+  // WEIGHT => qty = gramos (int), precio = por 100g
+  if (product.uom === "WEIGHT") {
+    ensureInt(qty, "INVALID_QTY_WEIGHT");
+    if (qty <= 0) throw new AppError(`Cantidad inválida para ${product.name}`, 400, "INVALID_QTY_WEIGHT");
+
+    // opcional: forzar múltiplos (ej. 10g)
+    // if (qty % 10 !== 0) throw new AppError(`Debe ser múltiplo de 10g: ${product.name}`, 400, "INVALID_QTY_WEIGHT");
+
+    const pricePer100g = unitPriceOverride ?? product.pricePer100g;
+    if (pricePer100g == null) throw new AppError(`Falta pricePer100g en ${product.name}`, 500, "PRICE_MISSING");
+
+    const subtotal = round2((qty / 100) * pricePer100g);
+    return { unitPriceSnapshot: pricePer100g, subtotal };
+  }
+
+  throw new AppError(`UOM inválida en producto ${product.name}`, 500, "INVALID_UOM");
+}
+
 export async function createSale(payload, userId) {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -137,7 +176,7 @@ export async function createSale(payload, userId) {
     const products = await Product.find({ _id: { $in: productIds }, active: true }).session(session);
     const map = new Map(products.map(p => [p._id.toString(), p]));
 
-    // 4) Armar items con snapshots y calcular total de items
+    // 4) Armar items + calcular total
     const saleItems = [];
     let itemsTotal = 0;
 
@@ -145,24 +184,25 @@ export async function createSale(payload, userId) {
       const p = map.get(it.productId);
       if (!p) throw new AppError(`Producto inválido o inactivo: ${it.productId}`, 400, "INVALID_PRODUCT");
 
-      const qty = it.qty;
-      const unitPrice = (it.unitPrice ?? p.priceCurrent);
-      const unitCost = p.costCurrent;
+      const qty = it.qty; // UNIT => unidades; WEIGHT => gramos
+      const unitCost = p.costCurrent ?? 0;
 
-      const subtotal = round2(qty * unitPrice);
+      const { unitPriceSnapshot, subtotal } = computeSubtotal(p, qty, it.unitPrice);
+
       itemsTotal = round2(itemsTotal + subtotal);
 
       saleItems.push({
         productId: p._id,
         nameSnapshot: p.name,
+        uomSnapshot: p.uom,                 // ✅ NUEVO (debe existir en SaleItemSchema)
         qty,
-        unitPriceSnapshot: unitPrice,
+        unitPriceSnapshot,                  // UNIT: por unidad | WEIGHT: por 100g
         unitCostSnapshot: unitCost,
         subtotal,
       });
     }
 
-    // 5) Validación: total pagado debe coincidir con total items
+    // 5) Validación: total pagado = total venta
     if (round2(itemsTotal) !== round2(totalPaid)) {
       throw new AppError(
         `El total pagado (${totalPaid}) no coincide con el total de la venta (${itemsTotal})`,
@@ -171,7 +211,8 @@ export async function createSale(payload, userId) {
       );
     }
 
-    // 6) Descontar stock con condición (concurrencia-safe)
+    // 6) Descontar stock (concurrencia-safe)
+    //    stockCurrent está en unidades o gramos según product.uom, y qty idem.
     for (const it of saleItems) {
       const updated = await Product.findOneAndUpdate(
         { _id: it.productId, stockCurrent: { $gte: it.qty } },
@@ -180,7 +221,8 @@ export async function createSale(payload, userId) {
       );
 
       if (!updated) {
-        throw new AppError(`Stock insuficiente para ${it.nameSnapshot}`, 409, "INSUFFICIENT_STOCK");
+        const label = it.uomSnapshot === "WEIGHT" ? "Stock (gramos)" : "Stock (unidades)";
+        throw new AppError(`${label} insuficiente para ${it.nameSnapshot}`, 409, "INSUFFICIENT_STOCK");
       }
     }
 
@@ -198,13 +240,14 @@ export async function createSale(payload, userId) {
       { session }
     );
 
-    // 8) Movimientos de stock
+    // 8) Movimientos de stock (registramos qty y uom)
     await StockMovement.insertMany(
       saleItems.map(it => ({
         productId: it.productId,
         type: "OUT",
         reason: "SALE",
-        qty: it.qty,
+        qty: it.qty,                        // unidades o gramos
+        uomSnapshot: it.uomSnapshot,        // ✅ NUEVO (agregar al schema StockMovement si querés)
         unitCostSnapshot: it.unitCostSnapshot,
         saleId: sale._id,
         userId,
@@ -223,3 +266,4 @@ export async function createSale(payload, userId) {
     throw err;
   }
 }
+

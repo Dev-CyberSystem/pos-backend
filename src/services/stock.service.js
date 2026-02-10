@@ -73,3 +73,78 @@ export async function listMovements({ productId, page = "1", limit = "20" }) {
 
   return { items, total, page: p, limit: l, pages: Math.ceil(total / l) };
 }
+export async function createStockMovement(payload, userId) {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const p = await Product.findById(payload.productId).session(session);
+    if (!p) throw new AppError("Producto no encontrado", 404, "PRODUCT_NOT_FOUND");
+    if (!p.active) throw new AppError("Producto inactivo", 409, "PRODUCT_INACTIVE");
+
+    const qty = payload.qty;
+    if (!Number.isInteger(qty) || qty <= 0) {
+      throw new AppError("Cantidad inválida", 400, "INVALID_QTY");
+    }
+
+    // Opcional: si es WEIGHT, podrías exigir múltiplos de 10g
+    // if (p.uom === "WEIGHT" && qty % 10 !== 0) throw new AppError("Debe ser múltiplo de 10g", 400, "INVALID_QTY");
+
+    let inc = 0;
+
+    if (payload.type === "IN") inc = qty;
+    if (payload.type === "OUT") inc = -qty;
+
+    if (payload.type === "ADJUST") {
+      // Ajuste al valor absoluto (stockCurrent = qty)
+      // calculamos delta
+      const delta = qty - p.stockCurrent;
+      inc = delta;
+    }
+
+    // Validación de stock para OUT
+    if (payload.type === "OUT" && p.stockCurrent < qty) {
+      const label = p.uom === "WEIGHT" ? "Stock (gramos)" : "Stock (unidades)";
+      throw new AppError(`${label} insuficiente`, 409, "INSUFFICIENT_STOCK");
+    }
+
+    // actualizar stock
+    if (payload.type === "ADJUST") {
+      p.stockCurrent = qty;
+      await p.save({ session });
+    } else {
+      await Product.updateOne({ _id: p._id }, { $inc: { stockCurrent: inc } }, { session });
+    }
+
+    // registrar movimiento
+    const [mov] = await StockMovement.create(
+      [{
+        productId: p._id,
+        type: payload.type,
+        reason: payload.reason,
+        qty,
+        // opcional para auditoría:
+        uomSnapshot: p.uom,
+        unitCostSnapshot: p.costCurrent ?? 0,
+        userId,
+        note: payload.note || "",
+      }],
+      { session }
+    );
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return mov;
+  } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
+    throw err;
+  }
+}
+
+export async function listStockMovements({ productId, limit = 50 } = {}) {
+  const filter = {};
+  if (productId) filter.productId = productId;
+  return StockMovement.find(filter).sort({ createdAt: -1 }).limit(Math.min(Number(limit) || 50, 200));
+}

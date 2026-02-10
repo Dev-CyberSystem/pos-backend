@@ -1,20 +1,90 @@
-// /src/models/Product.js
+// import mongoose from "mongoose";
+// import { UOM } from "./enums.js";
+
+// const ProductSchema = new mongoose.Schema(
+//   {
+//     sku: { type: String, trim: true, index: true },
+//     name: { type: String, required: true, trim: true },
+
+//     uom: { type: String, enum: UOM, required: true, default: "UNIT" },
+
+//     // precios (según uom)
+//     pricePerUnit: { type: Number, min: 0 },
+//     pricePer100g: { type: Number, min: 0 },
+
+//     costCurrent: { type: Number, min: 0, default: 0 },
+
+//     // stock: UNIT => unidades; WEIGHT => gramos
+//     stockCurrent: { type: Number, min: 0, default: 0 },
+//     stockMin: { type: Number, min: 0, default: 0 },
+
+//     active: { type: Boolean, default: true },
+//   },
+//   { timestamps: true }
+// );
+
+// // regla: si WEIGHT => debe tener pricePer100g; si UNIT => pricePerUnit
+// ProductSchema.pre("validate", function (next) {
+//   if (this.uom === "WEIGHT") {
+//     if (this.pricePer100g == null) return next(new Error("WEIGHT requiere pricePer100g"));
+//   }
+//   if (this.uom === "UNIT") {
+//     if (this.pricePerUnit == null) return next(new Error("UNIT requiere pricePerUnit"));
+//   }
+//   next();
+// });
+
+// export default mongoose.model("Product", ProductSchema);
+
 import mongoose from "mongoose";
+
+const UOM = ["UNIT", "WEIGHT"];
 
 const ProductSchema = new mongoose.Schema(
   {
-    sku: { type: String, trim: true, index: true, unique: true, sparse: true },
-    name: { type: String, required: true, trim: true, index: true },
+    sku: { type: String, trim: true, index: true },
+    name: { type: String, required: true, trim: true },
 
-    costCurrent: { type: Number, required: true, min: 0 },
-    priceCurrent: { type: Number, required: true, min: 0 },
+    // Unidad de medida
+    // UNIT => stock en unidades
+    // WEIGHT => stock en gramos
+    uom: { type: String, enum: UOM, required: true, default: "UNIT", index: true },
 
-    stockCurrent: { type: Number, required: true, min: 0 },
-    stockMin: { type: Number, default: 0, min: 0 },
+    // Precios (según uom)
+    // UNIT => pricePerUnit obligatorio
+    pricePerUnit: { type: Number, min: 0 },
+    // WEIGHT => pricePer100g obligatorio
+    pricePer100g: { type: Number, min: 0 },
 
-    active: { type: Boolean, default: true },
+    // costo unitario (para WEIGHT es costo por 100g? para MVP lo dejamos como costo "referencia")
+    // lo usamos como snapshot en la venta / movimientos (mismo campo para ambos).
+    costCurrent: { type: Number, min: 0, default: 0 },
+
+    // Stock: UNIT => unidades; WEIGHT => gramos
+    stockCurrent: { type: Number, min: 0, default: 0 },
+    stockMin: { type: Number, min: 0, default: 0 },
+
+    active: { type: Boolean, default: true, index: true },
   },
   { timestamps: true }
 );
 
+// Validaciones cruzadas
+ProductSchema.pre("validate", function (next) {
+  if (this.uom === "UNIT") {
+    if (this.pricePerUnit == null) return next(new Error("UNIT requiere pricePerUnit"));
+    // opcional: no permitir pricePer100g en UNIT
+    // this.pricePer100g = undefined;
+  }
+
+  if (this.uom === "WEIGHT") {
+    if (this.pricePer100g == null) return next(new Error("WEIGHT requiere pricePer100g"));
+    // opcional: no permitir pricePerUnit en WEIGHT
+    // this.pricePerUnit = undefined;
+  }
+
+  next();
+});
+
 export default mongoose.model("Product", ProductSchema);
+export { UOM };

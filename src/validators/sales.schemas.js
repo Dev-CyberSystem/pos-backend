@@ -3,9 +3,10 @@ import { PaymentTypes } from "../models/enums.js";
 
 const saleItemSchema = z.object({
   productId: z.string().min(1),
-  qty: z.number().int().positive(),
-  unitPrice: z.number().min(0).optional(),
+  qty: z.number().positive(), // UNIT: entero; WEIGHT: entero gramos (lo validamos en service)
+  unitPrice: z.number().min(0).optional(), // override si querés
 });
+
 
 const salePaymentSchema = z.object({
   type: z.enum(PaymentTypes),

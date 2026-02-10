@@ -5,8 +5,8 @@ export const createStockMovementSchema = z.object({
   productId: z.string().min(1),
   type: z.enum(StockMovementTypes),
   reason: z.enum(StockMovementReasons),
-  qty: z.number().positive(), // siempre positivo; el type define cómo impacta
-  note: z.string().trim().max(200).optional(),
+  qty: z.number().int().positive(), // UNIT=unidades, WEIGHT=gramos
+  note: z.string().max(200).optional(),
 });
 
 export const listStockMovementsQuerySchema = z.object({
