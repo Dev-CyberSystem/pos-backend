@@ -33,4 +33,6 @@ router.post(
   ctrl.createCashMovement,
 );
 
+router.get("/", authRequired,  ctrl.list);
+
 export default router;

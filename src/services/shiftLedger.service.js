@@ -1,6 +1,6 @@
 import Shift from "../models/Shift.js";
 import Sale from "../models/Sale.js";
-import CashMovement from "../models/CashMovement.model.js";
+import CashMovement from "../models/cashMovement.model.js";
 import { AppError } from "../utils/errors.js";
 
 function round2(n) {

@@ -7,6 +7,8 @@ import { notFound } from "./middlewares/notFound.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
 import { env } from "./config/env.js";
 
+
+
 const app = express();
 
 // Trust proxy (útil si luego lo ponés detrás de Nginx/Render/etc.)
@@ -32,5 +34,8 @@ app.use("/api", routes);
 // Not found + error handler
 app.use(notFound);
 app.use(errorHandler);
+
+
+
 
 export default app;
