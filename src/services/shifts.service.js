@@ -3,24 +3,52 @@ import Sale from "../models/Sale.js";
 import { AppError } from "../utils/errors.js";
 
 export async function openShift({ date, shiftType, openingCash }, userId) {
-  const exists = await Shift.findOne({ date, shiftType });
-  if (exists) throw new AppError("Ese turno ya está abierto/creado", 409, "SHIFT_EXISTS");
+  const open = await Shift.findOne({ date, shiftType, status: "OPEN" });
+  if (open) throw new AppError("Ese turno ya está abierto", 409, "SHIFT_EXISTS");
 
-  const shift = await Shift.create({
+  const closed = await Shift.findOne({ date, shiftType, status: "CLOSED" });
+
+  if (closed) {
+    closed.status = "OPEN";
+    closed.openedBy = userId;
+    closed.openingCash = openingCash ?? closed.openingCash ?? 0;
+    closed.openedAt = new Date();
+    closed.closedAt = undefined;
+    closed.closedBy = undefined;
+    closed.closingCashCounted = undefined;
+    // opcional: reset totals del cierre anterior
+    closed.totalsByPayment = { CASH: 0, DEBIT: 0, TRANSFER: 0, CREDIT: 0 };
+    closed.cashExpected = closed.openingCash || 0;
+    closed.cashDifference = 0;
+
+    await closed.save();
+    return closed;
+  }
+
+  return Shift.create({
     date,
     shiftType,
     openedBy: userId,
     openingCash: openingCash ?? 0,
     status: "OPEN",
+    openedAt: new Date(),
   });
+}
 
-  return shift;
+function todayYYYYMMDD() {
+  return new Date().toLocaleDateString("en-CA");
 }
 
 export async function getTodayShifts(date) {
-  const shifts = await Shift.find({ date }).sort({ shiftType: 1 }).lean();
-  return shifts;
+  const d = date || todayYYYYMMDD();
+  return Shift.find({ date: d }).sort({ shiftType: 1 }).lean();
 }
+
+
+// export async function getTodayShifts(date) {
+//   const shifts = await Shift.find({ date }).sort({ shiftType: 1 }).lean();
+//   return shifts;
+// }
 
 export async function closeShift(shiftId, { closingCashCounted }, userId) {
   const shift = await Shift.findById(shiftId);
