@@ -11,6 +11,8 @@ export const createStockMovementSchema = z.object({
 
 export const listStockMovementsQuerySchema = z.object({
   productId: z.string().optional(),
+  type: z.enum(StockMovementTypes).optional(),
+  reason: z.enum(StockMovementReasons).optional(),
   page: z.string().optional(),
   limit: z.string().optional(),
 });

@@ -143,8 +143,28 @@ export async function createStockMovement(payload, userId) {
   }
 }
 
-export async function listStockMovements({ productId, limit = 50 } = {}) {
-  const filter = {};
-  if (productId) filter.productId = productId;
-  return StockMovement.find(filter).sort({ createdAt: -1 }).limit(Math.min(Number(limit) || 50, 200));
+// export async function listStockMovements({ productId, limit = 50 } = {}) {
+//   const filter = {};
+//   if (productId) filter.productId = productId;
+//   return StockMovement.find(filter).sort({ createdAt: -1 }).limit(Math.min(Number(limit) || 50, 200));
+// }
+
+export async function listStockMovements({ productId, type, reason, limit, page }) {
+  const q = {};
+  if (productId) q.productId = productId;
+  if (type) q.type = type;
+  if (reason) q.reason = reason;
+
+  const lim = Math.min(Number(limit || 50), 200);
+  const pg = Math.max(Number(page || 1), 1);
+  const skip = (pg - 1) * lim;
+
+  const items = await StockMovement.find(q)
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(lim)
+    .populate("productId", "name sku uom")
+    .lean();
+
+  return items;
 }
