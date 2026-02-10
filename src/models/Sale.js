@@ -79,6 +79,15 @@ const SaleSchema = new mongoose.Schema(
 
     ticketPrinted: { type: Boolean, default: false },
     ticketPrintError: { type: String, trim: true },
+    ticketPrintCount: { type: Number, default: 0 },
+ticketLastPrintAt: { type: Date },
+ticketPrintHistory: [
+  {
+    at: { type: Date, default: Date.now },
+    action: { type: String, enum: ["PRINT", "REPRINT", "RESULT_OK", "RESULT_FAIL"], required: true },
+    note: { type: String, trim: true },
+  },
+],
   },
   { timestamps: true }
 );

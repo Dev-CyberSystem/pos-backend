@@ -11,13 +11,19 @@
     "lint:fix": "eslint . --fix"
   },
   "dependencies": {
+    "@thiagoelg/node-printer": "^0.6.2",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
+    "escpos": "^3.0.0-alpha.6",
+    "escpos-network": "^3.0.0-alpha.5",
+    "escpos-usb": "^3.0.0-alpha.4",
     "express": "^4.19.2",
+    "iconv-lite": "^0.7.2",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^8.9.2",
     "morgan": "^1.10.0",
+    "node-thermal-printer": "^4.6.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
