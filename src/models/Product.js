@@ -86,5 +86,8 @@ ProductSchema.pre("validate", function (next) {
   next();
 });
 
+ProductSchema.index({ name: 1 });
+ProductSchema.index({ sku: 1 });
+
 export default mongoose.model("Product", ProductSchema);
 export { UOM };
