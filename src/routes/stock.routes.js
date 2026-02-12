@@ -13,5 +13,6 @@ router.use(requireRole("admin")); // movimientos manuales: admin
 
 router.post("/movements", validate(createStockMovementSchema), ctrl.createMovement);
 router.get("/movements", validateQuery(listStockMovementsQuerySchema), ctrl.listMovements);
+router.get("/summary", authRequired, requireRole("admin"), ctrl.stockSummary);
 
 export default router;
