@@ -22,8 +22,12 @@ function mask(v) {
   return String(v).slice(0, 4) + "..." + String(v).slice(-4);
 }
 
-function requireAgent(req, res) {
-  const token = req.header("x-agent-token");
+export function requireAgent(req, res) {
+  const token =
+    req.get("x-agent-token") ||
+    req.header("x-agent-token") ||
+    req.headers["x-agent-token"];
+
   console.log("AGENT debug:", {
     received: !!token,
     receivedMasked: mask(token),
@@ -32,20 +36,22 @@ function requireAgent(req, res) {
   });
 
   if (!process.env.AGENT_TOKEN) {
-    return res.status(500).json({ ok: false, error: "AGENT_TOKEN_NOT_SET" });
+    return res.status(500).json({ ok: false, error: "AGENT_TOKEN_NOT_SETT" });
   }
 
   if (!token || token !== process.env.AGENT_TOKEN) {
-    return res.status(401).json({ ok: false, error: "AGENT_UNAUTHORIZED" });
+    return res.status(401).json({ ok: false, error: "AGENT_UNAUTHORIZEDD" });
   }
 
   return null;
 }
 
 
+
 export async function getNextJob(req, res) {
   const denied = requireAgent(req, res);
   if (denied) return;
+
 
   const job = await PrintJob.findOneAndUpdate(
     { status: "PENDING" },
