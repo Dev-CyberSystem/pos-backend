@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import Sale from "../../models/Sale.js";
 import { AppError } from "../../utils/errors.js";
 import { buildTicketText } from "./ticket.template.js";
+import PrintJob from "../../models/PrintJob.js";
 // import { printText } from "./escpos.adapter.js";
 // import { printRawText } from "./raw-windows.adapter.js";
 
@@ -116,71 +117,100 @@ export async function reportPrintResult(saleId, { success, message }, userId) {
     throw err;
   }
 }
-export async function printSaleTicket(saleId, { mode = "PRINT" } = {}, userId) {
-  const enabled =
-    (process.env.PRINTER_ENABLED || "false").toLowerCase() === "true";
-  if (!enabled)
-    throw new AppError("Impresión deshabilitada", 400, "PRINT_DISABLED");
+export async function createPrintJobForSale(saleId, { mode = "PRINT" } = {}, userId) {
+  const sale = await Sale.findById(saleId).populate("shiftId", "date shiftType");
+  if (!sale) throw new AppError("Venta no encontrada", 404, "SALE_NOT_FOUND");
 
-  if (process.platform !== "win32") {
-    throw new AppError(
-      "Impresión RAW solo disponible en Windows",
-      400,
-      "PRINT_PLATFORM_UNSUPPORTED",
-    );
-  }
+  const text = buildTicketText({ business: BUSINESS, sale: sale.toObject() });
 
-  const { printRawText } = await import("./raw-windows.adapter.js");
+  const job = await PrintJob.create({
+    saleId,
+    text,
+    status: "PENDING",
+    attempts: 0,
+    lastError: "",
+  });
 
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  // Historial (sin marcar impreso todavía)
+  sale.ticketPrintCount = (sale.ticketPrintCount || 0) + 1;
+  sale.ticketLastPrintAt = new Date();
+  sale.ticketPrintHistory = sale.ticketPrintHistory || [];
+  sale.ticketPrintHistory.push({
+    action: mode === "REPRINT" ? "REPRINT_JOB" : "PRINT_JOB",
+    note: `jobId=${job._id} user=${userId}`,
+  });
 
-  try {
-    const sale = await Sale.findById(saleId)
-      .populate("shiftId", "date shiftType")
-      .session(session);
-    if (!sale) throw new AppError("Venta no encontrada", 404, "SALE_NOT_FOUND");
+  await sale.save();
 
-    const text = buildTicketText({ business: BUSINESS, sale: sale.toObject() });
-
-    // imprimir RAW (Windows spooler)
-    // const jobId = printRawText(text, process.env.PRINTER_NAME);
-     const jobId = await printRawText(text, process.env.PRINTER_NAME);
-
-    // registrar intento / resultado (asumimos OK si el spooler aceptó el job)
-    sale.ticketPrintCount = (sale.ticketPrintCount || 0) + 1;
-    sale.ticketLastPrintAt = new Date();
-    sale.ticketPrinted = true;
-    sale.ticketPrintError = "";
-    sale.ticketPrintHistory = sale.ticketPrintHistory || [];
-    sale.ticketPrintHistory.push({
-      action: mode === "REPRINT" ? "REPRINT" : "PRINT",
-      note: `jobId=${jobId} user=${userId}`,
-    });
-
-    await sale.save({ session });
-
-    await session.commitTransaction();
-    session.endSession();
-
-    return { sale, text, jobId };
-  } catch (err) {
-    await session.abortTransaction();
-    session.endSession();
-
-    // si falla antes de commit, guardamos error fuera de txn (best effort)
-    try {
-      await Sale.updateOne(
-        { _id: saleId },
-        {
-          $set: {
-            ticketPrinted: false,
-            ticketPrintError: String(err?.message || "Error de impresión"),
-          },
-        },
-      );
-    } catch {}
-
-    throw err;
-  }
+  return { jobId: String(job._id), saleId: String(saleId) };
 }
+// export async function printSaleTicket(saleId, { mode = "PRINT" } = {}, userId) {
+//   const enabled =
+//     (process.env.PRINTER_ENABLED || "false").toLowerCase() === "true";
+//   if (!enabled)
+//     throw new AppError("Impresión deshabilitada", 400, "PRINT_DISABLED");
+
+//   if (process.platform !== "win32") {
+//     throw new AppError(
+//       "Impresión RAW solo disponible en Windows",
+//       400,
+//       "PRINT_PLATFORM_UNSUPPORTED",
+//     );
+//   }
+
+//   const { printRawText } = await import("./raw-windows.adapter.js");
+
+//   const session = await mongoose.startSession();
+//   session.startTransaction();
+
+//   try {
+//     const sale = await Sale.findById(saleId)
+//       .populate("shiftId", "date shiftType")
+//       .session(session);
+//     if (!sale) throw new AppError("Venta no encontrada", 404, "SALE_NOT_FOUND");
+
+//     const text = buildTicketText({ business: BUSINESS, sale: sale.toObject() });
+
+//     // imprimir RAW (Windows spooler)
+//     // const jobId = printRawText(text, process.env.PRINTER_NAME);
+//      const jobId = await printRawText(text, process.env.PRINTER_NAME);
+
+//     // registrar intento / resultado (asumimos OK si el spooler aceptó el job)
+//     sale.ticketPrintCount = (sale.ticketPrintCount || 0) + 1;
+//     sale.ticketLastPrintAt = new Date();
+//     sale.ticketPrinted = true;
+//     sale.ticketPrintError = "";
+//     sale.ticketPrintHistory = sale.ticketPrintHistory || [];
+//     sale.ticketPrintHistory.push({
+//       action: mode === "REPRINT" ? "REPRINT" : "PRINT",
+//       note: `jobId=${jobId} user=${userId}`,
+//     });
+
+//     await sale.save({ session });
+
+//     await session.commitTransaction();
+//     session.endSession();
+
+//     return { sale, text, jobId };
+//   } catch (err) {
+//     await session.abortTransaction();
+//     session.endSession();
+
+//     // si falla antes de commit, guardamos error fuera de txn (best effort)
+//     try {
+//       await Sale.updateOne(
+//         { _id: saleId },
+//         {
+//           $set: {
+//             ticketPrinted: false,
+//             ticketPrintError: String(err?.message || "Error de impresión"),
+//           },
+//         },
+//       );
+//     } catch {}
+
+//     throw err;
+//   }
+// }
+
+
