@@ -2,6 +2,8 @@ import PrintJob from "../models/PrintJob.js";
 import Sale from "../models/Sale.js";
 
 console.log("AGENT_TOKEN set?", !!process.env.AGENT_TOKEN);
+console.log("✅ Loaded printAgent.controller.js", import.meta.url);
+
 
 // function requireAgent(req, res) {
 //     console.log("agent token received?", !!req.header("x-agent-token"));

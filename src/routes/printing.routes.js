@@ -87,7 +87,7 @@ import { markPrintErrorSchema, printResultSchema } from "../validators/printing.
 
 const router = Router();
 
-router.use(authRequired);
+// router.use(authRequired);
 
 // Ver ticket (texto)
 router.get("/sales/:id/ticket", ctrl.getTicket);
