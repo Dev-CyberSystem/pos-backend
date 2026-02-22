@@ -1,41 +1,3 @@
-// import mongoose from "mongoose";
-// import { UOM } from "./enums.js";
-
-// const ProductSchema = new mongoose.Schema(
-//   {
-//     sku: { type: String, trim: true, index: true },
-//     name: { type: String, required: true, trim: true },
-
-//     uom: { type: String, enum: UOM, required: true, default: "UNIT" },
-
-//     // precios (según uom)
-//     pricePerUnit: { type: Number, min: 0 },
-//     pricePer100g: { type: Number, min: 0 },
-
-//     costCurrent: { type: Number, min: 0, default: 0 },
-
-//     // stock: UNIT => unidades; WEIGHT => gramos
-//     stockCurrent: { type: Number, min: 0, default: 0 },
-//     stockMin: { type: Number, min: 0, default: 0 },
-
-//     active: { type: Boolean, default: true },
-//   },
-//   { timestamps: true }
-// );
-
-// // regla: si WEIGHT => debe tener pricePer100g; si UNIT => pricePerUnit
-// ProductSchema.pre("validate", function (next) {
-//   if (this.uom === "WEIGHT") {
-//     if (this.pricePer100g == null) return next(new Error("WEIGHT requiere pricePer100g"));
-//   }
-//   if (this.uom === "UNIT") {
-//     if (this.pricePerUnit == null) return next(new Error("UNIT requiere pricePerUnit"));
-//   }
-//   next();
-// });
-
-// export default mongoose.model("Product", ProductSchema);
-
 import mongoose from "mongoose";
 
 const UOM = ["UNIT", "WEIGHT"];
@@ -87,7 +49,6 @@ ProductSchema.pre("validate", function (next) {
 });
 
 ProductSchema.index({ name: 1 });
-ProductSchema.index({ sku: 1 });
 
 export default mongoose.model("Product", ProductSchema);
 export { UOM };
