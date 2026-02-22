@@ -1,7 +1,10 @@
 import PrintJob from "../models/PrintJob.js";
 import Sale from "../models/Sale.js";
 
+console.log("AGENT_TOKEN set?", !!process.env.AGENT_TOKEN);
+
 function requireAgent(req, res) {
+    console.log("agent token received?", !!req.header("x-agent-token"));
   const token = req.header("x-agent-token");
 
   if (!process.env.AGENT_TOKEN) {
