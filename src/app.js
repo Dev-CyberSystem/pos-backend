@@ -10,15 +10,12 @@ import { env } from "./config/env.js";
 
 
 const app = express();
-// Trust proxy (útil si luego lo ponés detrás de Nginx/Render/etc.)
 app.set("trust proxy", 1);
 
 // Middlewares base
-// app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
 app.use(
   cors({
     origin: (origin, cb) => {
-      // Permite tools sin origin (Postman, health checks)
       if (!origin) return cb(null, true);
 
       if (!env.isProd) return cb(null, true);

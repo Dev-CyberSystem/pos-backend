@@ -6,14 +6,6 @@ escpos.USB = USB;
 
 const ENC = process.env.PRINTER_ENCODING || "CP850";
 
-// function parseHexEnv(name) {
-//   const v = process.env[name];
-//   if (!v) throw new Error(`Falta ${name} en .env`);
-//   // admite "0x04b8" o "04b8"
-//   const clean = v.startsWith("0x") ? v : "0x" + v;
-//   return parseInt(clean, 16);
-// }
-
 function parseVidPid(name) {
   const v = process.env[name];
   if (!v) throw new Error(`Falta ${name} en .env`);

@@ -7,7 +7,6 @@ export function errorHandler(err, req, res, next) {
     message: err.message || "Unexpected error",
   };
 
-  // En dev devolvemos stack para debug
   if (process.env.NODE_ENV !== "production") {
     payload.stack = err.stack;
   }

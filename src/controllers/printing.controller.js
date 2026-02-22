@@ -25,29 +25,7 @@ export const printResult = asyncHandler(async (req, res) => {
   const sale = await printService.reportPrintResult(req.params.id, req.body, req.user.id);
   res.json({ ok: true, data: sale });
 });
-// export const printSale = asyncHandler(async (req, res) => {
-//   const data = await printService.printSaleTicket(req.params.id, req.user.id);
-//   res.json({ ok: true, data });
-// });
 
-// export const printSale = asyncHandler(async (req, res) => {
-//   const data = await printService.printSaleTicket(req.params.id, { mode: "PRINT" }, req.user.id);
-//   res.json({ ok: true, data });
-// });
-
-// export const reprintSale = asyncHandler(async (req, res) => {
-//   const data = await printService.printSaleTicket(req.params.id, { mode: "REPRINT" }, req.user.id);
-//   res.json({ ok: true, data });
-// });
-// export const printSale = asyncHandler(async (req, res) => {
-//   const data = await printService.createPrintJobForSale(req.params.id, { mode: "PRINT" }, req.user.id);
-//   res.json({ ok: true, data });
-// });
-
-// export const reprintSale = asyncHandler(async (req, res) => {
-//   const data = await printService.createPrintJobForSale(req.params.id, { mode: "REPRINT" }, req.user.id);
-//   res.json({ ok: true, data });
-// });
 
 export const printSale = asyncHandler(async (req, res) => {
   const data = await printService.createPrintJobForSale(req.params.id, { mode: "PRINT" }, req.user.id);
