@@ -10,7 +10,6 @@ import { env } from "./config/env.js";
 
 
 const app = express();
-
 // Trust proxy (útil si luego lo ponés detrás de Nginx/Render/etc.)
 app.set("trust proxy", 1);
 

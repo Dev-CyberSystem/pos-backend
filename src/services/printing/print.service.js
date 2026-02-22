@@ -3,7 +3,7 @@ import Sale from "../../models/Sale.js";
 import { AppError } from "../../utils/errors.js";
 import { buildTicketText } from "./ticket.template.js";
 // import { printText } from "./escpos.adapter.js";
-import { printRawText } from "./raw-windows.adapter.js";
+// import { printRawText } from "./raw-windows.adapter.js";
 
 const BUSINESS = {
   name: process.env.BUSINESS_NAME || "MI TIENDA",
@@ -116,68 +116,36 @@ export async function reportPrintResult(saleId, { success, message }, userId) {
     throw err;
   }
 }
-// export async function printSaleTicket(saleId, userId) {
-//   const enabled = (process.env.PRINTER_ENABLED || "false").toLowerCase() === "true";
-//   if (!enabled) throw new AppError("Impresión deshabilitada (PRINTER_ENABLED=false)", 400, "PRINT_DISABLED");
-
-//   const session = await mongoose.startSession();
-//   session.startTransaction();
-
-//   try {
-//     const sale = await Sale.findById(saleId).populate("shiftId", "date shiftType").session(session);
-//     if (!sale) throw new AppError("Venta no encontrada", 404, "SALE_NOT_FOUND");
-
-//     const text = buildTicketText({ business: BUSINESS, sale: sale.toObject() });
-
-//     // intento imprimir
-//     try {
-//       await printText(text);
-
-//       sale.ticketPrinted = true;
-//       sale.ticketPrintError = "";
-//       sale.ticketPrintCount = (sale.ticketPrintCount || 0) + 1;
-//       sale.ticketLastPrintAt = new Date();
-//       sale.ticketPrintHistory = sale.ticketPrintHistory || [];
-//       sale.ticketPrintHistory.push({ action: "PRINT", note: `User ${userId}` });
-
-//       await sale.save({ session });
-//       await session.commitTransaction();
-//       session.endSession();
-
-//       return { sale, text };
-//     } catch (printErr) {
-//       sale.ticketPrinted = false;
-//       sale.ticketPrintError = String(printErr?.message || "Error de impresión");
-//       sale.ticketPrintHistory = sale.ticketPrintHistory || [];
-//       sale.ticketPrintHistory.push({ action: "RESULT_FAIL", note: `${sale.ticketPrintError} | User ${userId}` });
-//       await sale.save({ session });
-
-//       await session.commitTransaction();
-//       session.endSession();
-
-//       throw new AppError(sale.ticketPrintError, 500, "PRINT_FAILED");
-//     }
-//   } catch (err) {
-//     await session.abortTransaction();
-//     session.endSession();
-//     throw err;
-//   }
-// }
 export async function printSaleTicket(saleId, { mode = "PRINT" } = {}, userId) {
-  const enabled = (process.env.PRINTER_ENABLED || "false").toLowerCase() === "true";
-  if (!enabled) throw new AppError("Impresión deshabilitada", 400, "PRINT_DISABLED");
+  const enabled =
+    (process.env.PRINTER_ENABLED || "false").toLowerCase() === "true";
+  if (!enabled)
+    throw new AppError("Impresión deshabilitada", 400, "PRINT_DISABLED");
+
+  if (process.platform !== "win32") {
+    throw new AppError(
+      "Impresión RAW solo disponible en Windows",
+      400,
+      "PRINT_PLATFORM_UNSUPPORTED",
+    );
+  }
+
+  const { printRawText } = await import("./raw-windows.adapter.js");
 
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
-    const sale = await Sale.findById(saleId).populate("shiftId", "date shiftType").session(session);
+    const sale = await Sale.findById(saleId)
+      .populate("shiftId", "date shiftType")
+      .session(session);
     if (!sale) throw new AppError("Venta no encontrada", 404, "SALE_NOT_FOUND");
 
     const text = buildTicketText({ business: BUSINESS, sale: sale.toObject() });
 
     // imprimir RAW (Windows spooler)
-    const jobId = printRawText(text, process.env.PRINTER_NAME);
+    // const jobId = printRawText(text, process.env.PRINTER_NAME);
+     const jobId = await printRawText(text, process.env.PRINTER_NAME);
 
     // registrar intento / resultado (asumimos OK si el spooler aceptó el job)
     sale.ticketPrintCount = (sale.ticketPrintCount || 0) + 1;
@@ -185,7 +153,10 @@ export async function printSaleTicket(saleId, { mode = "PRINT" } = {}, userId) {
     sale.ticketPrinted = true;
     sale.ticketPrintError = "";
     sale.ticketPrintHistory = sale.ticketPrintHistory || [];
-    sale.ticketPrintHistory.push({ action: mode === "REPRINT" ? "REPRINT" : "PRINT", note: `jobId=${jobId} user=${userId}` });
+    sale.ticketPrintHistory.push({
+      action: mode === "REPRINT" ? "REPRINT" : "PRINT",
+      note: `jobId=${jobId} user=${userId}`,
+    });
 
     await sale.save({ session });
 
@@ -201,7 +172,12 @@ export async function printSaleTicket(saleId, { mode = "PRINT" } = {}, userId) {
     try {
       await Sale.updateOne(
         { _id: saleId },
-        { $set: { ticketPrinted: false, ticketPrintError: String(err?.message || "Error de impresión") } }
+        {
+          $set: {
+            ticketPrinted: false,
+            ticketPrintError: String(err?.message || "Error de impresión"),
+          },
+        },
       );
     } catch {}
 
