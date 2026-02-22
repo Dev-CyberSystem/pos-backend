@@ -4,6 +4,10 @@
   "description": "Backend POS (Stock + Ventas + Caja por turnos) - MERN",
   "type": "module",
   "main": "src/server.js",
+  "engines": {
+  "node": ">=20.19.1 <21"
+},
+
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
