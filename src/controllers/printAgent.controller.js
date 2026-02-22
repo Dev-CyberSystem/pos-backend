@@ -1,16 +1,23 @@
 import PrintJob from "../models/PrintJob.js";
 import Sale from "../models/Sale.js";
 
-function requireAgent(req) {
+function requireAgent(req, res) {
   const token = req.header("x-agent-token");
-  if (!token || token !== process.env.AGENT_TOKEN) {
-    return false;
+
+  if (!process.env.AGENT_TOKEN) {
+    return res.status(500).json({ ok: false, error: "AGENT_TOKEN_NOT_SET" });
   }
-  return true;
+
+  if (!token || token !== process.env.AGENT_TOKEN) {
+    return res.status(401).json({ ok: false, error: "AGENT_UNAUTHORIZED" });
+  }
+
+  return null;
 }
 
 export async function getNextJob(req, res) {
-  if (!requireAgent(req)) return res.status(401).json({ ok: false, error: "AGENT_UNAUTHORIZED" });
+  const denied = requireAgent(req, res);
+  if (denied) return;
 
   const job = await PrintJob.findOneAndUpdate(
     { status: "PENDING" },
@@ -31,7 +38,8 @@ export async function getNextJob(req, res) {
 }
 
 export async function postJobResult(req, res) {
-  if (!requireAgent(req)) return res.status(401).json({ ok: false, error: "AGENT_UNAUTHORIZED" });
+  const denied = requireAgent(req, res);
+  if (denied) return;
 
   const { success, message } = req.body || {};
   const jobId = req.params.jobId;
