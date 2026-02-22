@@ -8,7 +8,6 @@ import printingRoutes from "./printing.routes.js";
 import reportsRoutes from "./reports.routes.js";
 import printAgentRoutes from "./printAgent.routes.js";
 
-
 const router = Router();
 
 // Placeholder: después enchufamos módulos reales
@@ -23,9 +22,6 @@ router.use("/stock", stockRoutes);
 router.use("/sales", salesRoutes);
 router.use("/", printingRoutes);
 router.use("/reports", reportsRoutes);
-
-app.use("/", printAgentRoutes);
-
-
+router.use("/", printAgentRoutes);
 
 export default router;
