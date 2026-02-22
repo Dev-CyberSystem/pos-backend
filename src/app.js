@@ -15,7 +15,21 @@ const app = express();
 app.set("trust proxy", 1);
 
 // Middlewares base
-app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
+// app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      // Permite tools sin origin (Postman, health checks)
+      if (!origin) return cb(null, true);
+
+      if (!env.isProd) return cb(null, true);
+
+      const ok = env.CORS_ORIGINS.includes(origin);
+      return ok ? cb(null, true) : cb(new Error("CORS blocked"), false);
+    },
+    credentials: false, // true solo si usás cookies
+  })
+);
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
 

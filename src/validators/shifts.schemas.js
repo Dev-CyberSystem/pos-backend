@@ -4,7 +4,7 @@ import { ShiftTypes, CashMovementTypes, CashMovementReasons  } from "../models/e
 export const openShiftSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   shiftType: z.enum(ShiftTypes),
-  openingCash: z.number().min(0).optional(),
+  // openingCash: z.number().min(0).optional(),
 });
 
 export const closeShiftSchema = z.object({
@@ -22,4 +22,9 @@ export const ledgerQuerySchema = z.object({
   // opcional, por si querés limitar resultados
   salesLimit: z.string().optional(),
   cashLimit: z.string().optional(),
+});
+
+export const openingAdjustmentSchema = z.object({
+  openingCashCounted: z.number().min(0),
+  openingNote: z.string().trim().max(300).optional(),
 });
