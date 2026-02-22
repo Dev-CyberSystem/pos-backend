@@ -20,8 +20,8 @@ router.use("/shifts", shiftsRoutes);
 router.use("/products", productsRoutes);
 router.use("/stock", stockRoutes);
 router.use("/sales", salesRoutes);
+router.use("/", printAgentRoutes);
 router.use("/", printingRoutes);
 router.use("/reports", reportsRoutes);
-router.use("/", printAgentRoutes);
 
 export default router;

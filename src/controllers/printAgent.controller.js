@@ -21,39 +21,36 @@ console.log("✅ Loaded printAgent.controller.js", import.meta.url);
 // }
 function mask(v) {
   if (!v) return "";
-  return String(v).slice(0, 4) + "..." + String(v).slice(-4);
+  const s = String(v);
+  return s.slice(0, 4) + "..." + s.slice(-4);
 }
 
-export function requireAgent(req, res) {
-  const token =
+function requireAgent(req) {
+  const raw =
     req.get("x-agent-token") ||
     req.header("x-agent-token") ||
-    req.headers["x-agent-token"];
+    req.headers["x-agent-token"] ||
+    "";
+
+  const token = String(raw).trim();
+  const envToken = String(process.env.AGENT_TOKEN || "").trim();
 
   console.log("AGENT debug:", {
     received: !!token,
     receivedMasked: mask(token),
-    envSet: !!process.env.AGENT_TOKEN,
-    envMasked: mask(process.env.AGENT_TOKEN),
+    envSet: !!envToken,
+    envMasked: mask(envToken),
   });
 
-  if (!process.env.AGENT_TOKEN) {
-    return res.status(500).json({ ok: false, error: "AGENT_TOKEN_NOT_SETT" });
-  }
+  if (!envToken) return { ok: false, status: 500, error: "AGENT_TOKEN_NOT_SET" };
+  if (!token || token !== envToken) return { ok: false, status: 401, error: "AGENT_UNAUTHORIZED" };
 
-  if (!token || token !== process.env.AGENT_TOKEN) {
-    return res.status(401).json({ ok: false, error: "AGENT_UNAUTHORIZEDD" });
-  }
-
-  return null;
+  return { ok: true };
 }
 
-
-
 export async function getNextJob(req, res) {
-  const denied = requireAgent(req, res);
-  if (denied) return;
-
+  const auth = requireAgent(req);
+  if (!auth.ok) return res.status(auth.status).json({ ok: false, error: auth.error });
 
   const job = await PrintJob.findOneAndUpdate(
     { status: "PENDING" },
@@ -63,19 +60,15 @@ export async function getNextJob(req, res) {
 
   if (!job) return res.status(204).send();
 
-  res.json({
+  return res.json({
     ok: true,
-    data: {
-      jobId: String(job._id),
-      saleId: String(job.saleId),
-      text: job.text,
-    },
+    data: { jobId: String(job._id), saleId: String(job.saleId), text: job.text },
   });
 }
 
 export async function postJobResult(req, res) {
-  const denied = requireAgent(req, res);
-  if (denied) return;
+  const auth = requireAgent(req);
+  if (!auth.ok) return res.status(auth.status).json({ ok: false, error: auth.error });
 
   const { success, message } = req.body || {};
   const jobId = req.params.jobId;
@@ -90,13 +83,8 @@ export async function postJobResult(req, res) {
 
   await Sale.updateOne(
     { _id: job.saleId },
-    {
-      $set: {
-        ticketPrinted: !!success,
-        ticketPrintError: success ? "" : job.lastError,
-      },
-    }
+    { $set: { ticketPrinted: !!success, ticketPrintError: success ? "" : job.lastError } }
   );
 
-  res.json({ ok: true, data: { jobId: String(job._id), status: job.status } });
+  return res.json({ ok: true, data: { jobId: String(job._id), status: job.status } });
 }
