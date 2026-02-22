@@ -6,7 +6,7 @@ import productsRoutes from "./products.routes.js";
 import salesRoutes from "./sales.routes.js";
 import printingRoutes from "./printing.routes.js";
 import reportsRoutes from "./reports.routes.js";
-import printAgentRoutes from "./routes/printAgent.routes.js";
+import printAgentRoutes from "./printAgent.routes.js";
 
 
 const router = Router();
